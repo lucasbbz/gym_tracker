@@ -1,0 +1,2011 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <!-- Configuration iOS PWA & Viewport optimisé sans zoom intempestif -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GymTracker">
+    <meta name="theme-color" content="#09090b">
+    <title>GymTracker Pro — Suivi Musculation iOS</title>
+
+    <!-- Icône iOS Home Screen générée en SVG Data URI -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%2309090b'/><rect x='12' y='12' width='156' height='156' rx='32' fill='%2318181b' stroke='%2310b981' stroke-width='4'/><path d='M52 68v44M38 78v24M128 68v44M142 78v24M52 90h76' stroke='%2310b981' stroke-width='12' stroke-linecap='round'/></svg>">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        oled: {
+                            950: '#09090b',
+                            900: '#121215',
+                            800: '#18181b',
+                            700: '#27272a',
+                            600: '#3f3f46'
+                        },
+                        emerald: {
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669'
+                        },
+                        indigo: {
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'Segoe UI', 'Roboto', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Chart.js CDN pour le suivi analytique -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- Injection dynamique du Web App Manifest (PWA) -->
+    <script>
+        (function injectManifest() {
+            const manifest = {
+                name: "GymTracker Pro - Suivi Musculation",
+                short_name: "GymTracker",
+                description: "Application locale de suivi de musculation et surcharge progressive sur iPhone",
+                start_url: ".",
+                display: "standalone",
+                background_color: "#09090b",
+                theme_color: "#09090b",
+                orientation: "portrait",
+                icons: [
+                    {
+                        src: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='110' fill='%2309090b'/><path d='M148 190v132M108 220v72M364 190v132M404 220v72M148 256h216' stroke='%2310b981' stroke-width='34' stroke-linecap='round'/></svg>",
+                        sizes: "512x512",
+                        type: "image/svg+xml",
+                        purpose: "any maskable"
+                    }
+                ]
+            };
+            const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = URL.createObjectURL(blob);
+            document.head.appendChild(link);
+        })();
+    </script>
+
+    <style>
+        /* Optimisations iOS Safari & OLED */
+        :root {
+            --sat: env(safe-area-inset-top, 0px);
+            --sab: env(safe-area-inset-bottom, 0px);
+        }
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+        body {
+            background-color: #09090b;
+            color: #f4f4f5;
+            overscroll-behavior-y: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        input, textarea, select {
+            user-select: text;
+            -webkit-user-select: text;
+            font-size: 16px !important; /* Empêche le zoom automatique d'iOS Safari au focus */
+        }
+        .pt-safe {
+            padding-top: max(0.75rem, env(safe-area-inset-top));
+        }
+        .pb-safe {
+            padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+        }
+        ::-webkit-scrollbar {
+            width: 0px;
+            height: 0px;
+            background: transparent;
+        }
+        .fade-in {
+            animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Zone tactile minimale garantie de 44x44px selon les Apple Human Interface Guidelines */
+        .touch-target {
+            min-width: 44px;
+            min-height: 44px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-oled-950 text-zinc-100 antialiased selection:bg-emerald-500 selection:text-zinc-950">
+
+    <!-- ================= HEADER STICKY + CHRONO DE REPOS ================= -->
+    <header class="sticky top-0 z-30 bg-oled-950/90 backdrop-blur-md border-b border-oled-700/80 pt-safe px-4 pb-3">
+        <div class="max-w-2xl mx-auto flex items-center justify-between gap-2">
+            <!-- Branding & Statut Auto-save -->
+            <div class="flex items-center gap-2.5">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m6.5 6.5 11 11"/><path d="m21 21-1-1"/><path d="m3 3 1 1"/><path d="m18 22 4-4"/><path d="m2 6 4-4"/><path d="m3 10 7-7"/><path d="m14 21 7-7"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-extrabold tracking-tight text-white leading-none">GYM<span class="text-emerald-400">TRACKER</span></h1>
+                        <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-oled-800 text-zinc-400 border border-oled-700">iOS PWA</span>
+                    </div>
+                    <p id="autosave-indicator" class="text-[11px] text-emerald-400/90 font-medium flex items-center gap-1 mt-0.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>IndexedDB • Sauvegarde auto</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Chronomètre de repos intégré -->
+            <div class="flex items-center gap-1.5 bg-oled-800 border border-oled-700 rounded-xl p-1">
+                <button onclick="App.toggleRestTimerPreset(90)" class="touch-target px-2.5 py-1.5 rounded-lg text-xs font-bold text-zinc-300 hover:text-white active:bg-oled-700 transition" title="Repos Isolation 1m30">
+                    1:30
+                </button>
+                <button onclick="App.toggleRestTimerPreset(150)" class="touch-target px-2.5 py-1.5 rounded-lg text-xs font-bold text-zinc-300 hover:text-white active:bg-oled-700 transition" title="Repos Polyarticulaire 2m30">
+                    2:30
+                </button>
+                <button id="timer-display-btn" onclick="App.stopRestTimer()" class="touch-target px-3 py-1.5 rounded-lg bg-oled-900 border border-oled-700 flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M9 3h6"/></svg>
+                    <span id="timer-label">Repos</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= CONTENU PRINCIPAL ================= -->
+    <main class="flex-1 w-full max-w-2xl mx-auto px-3.5 pt-4 pb-28 overflow-x-hidden">
+
+        <!-- 1. VUE SÉANCE EN DIRECT (LIVE WORKOUT) -->
+        <section id="view-workout" class="fade-in space-y-4">
+            <!-- Bandeau Mode Édition (affiché uniquement si on modifie une séance de l'historique) -->
+            <div id="edit-mode-banner" class="hidden bg-indigo-500/15 border border-indigo-500/40 rounded-2xl p-3 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 text-indigo-300 text-xs font-semibold">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    <span>Modification d'une séance enregistrée</span>
+                </div>
+                <button onclick="App.resetToNewWorkout()" class="touch-target px-3 py-1.5 rounded-xl bg-oled-800 text-xs font-bold text-zinc-200 border border-oled-700">
+                    Nouvelle séance
+                </button>
+            </div>
+
+            <!-- Sélecteur rapide des 4 séances du programme 8 semaines -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-zinc-400">Programme 8 Semaines (Half-Body)</span>
+                    <span class="text-[11px] text-zinc-500">Pré-remplit tes dernières charges</span>
+                </div>
+                <div class="flex gap-2 overflow-x-auto pb-1">
+                    <button onclick="App.loadTemplate('s1')" class="touch-target shrink-0 px-3.5 py-2 rounded-xl bg-oled-800 hover:bg-oled-700 border border-oled-700 text-xs font-bold text-white flex items-center gap-1.5 active:scale-95 transition">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        Séance 1 • Haut (Force)
+                    </button>
+                    <button onclick="App.loadTemplate('s2')" class="touch-target shrink-0 px-3.5 py-2 rounded-xl bg-oled-800 hover:bg-oled-700 border border-oled-700 text-xs font-bold text-white flex items-center gap-1.5 active:scale-95 transition">
+                        <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+                        Séance 2 • Bas (Squat)
+                    </button>
+                    <button onclick="App.loadTemplate('s3')" class="touch-target shrink-0 px-3.5 py-2 rounded-xl bg-oled-800 hover:bg-oled-700 border border-oled-700 text-xs font-bold text-white flex items-center gap-1.5 active:scale-95 transition">
+                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        Séance 3 • Haut (Volume)
+                    </button>
+                    <button onclick="App.loadTemplate('s4')" class="touch-target shrink-0 px-3.5 py-2 rounded-xl bg-oled-800 hover:bg-oled-700 border border-oled-700 text-xs font-bold text-white flex items-center gap-1.5 active:scale-95 transition">
+                        <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                        Séance 4 • Bas (Ischios)
+                    </button>
+                    <button onclick="App.loadTemplate('empty')" class="touch-target shrink-0 px-3.5 py-2 rounded-xl bg-oled-950 hover:bg-oled-800 border border-oled-700 text-xs font-semibold text-zinc-300 active:scale-95 transition">
+                        + Séance Libre
+                    </button>
+                </div>
+            </div>
+
+            <!-- Métadonnées de la séance : Titre & Date ISO éditable -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-2">
+                    <label for="workout-title-input" class="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Titre de la séance</label>
+                    <input id="workout-title-input" type="text" oninput="App.updateWorkoutMeta()" placeholder="Ex: Séance 1 : Haut du corps"
+                        class="w-full touch-target bg-oled-950 border border-oled-700 rounded-xl px-3.5 py-2.5 text-white font-bold focus:outline-none focus:border-emerald-500 transition">
+                </div>
+                <div>
+                    <label for="workout-date-input" class="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Date de séance</label>
+                    <input id="workout-date-input" type="date" onchange="App.updateWorkoutMeta()"
+                        class="w-full touch-target bg-oled-950 border border-oled-700 rounded-xl px-3.5 py-2.5 text-white font-semibold focus:outline-none focus:border-emerald-500 transition">
+                </div>
+            </div>
+
+            <!-- Conteneur dynamique des exercices de la séance -->
+            <div id="workout-exercises-container" class="space-y-4"></div>
+
+            <!-- Bouton d'ajout d'exercice -->
+            <button onclick="App.openExercisePickerModal()" class="w-full touch-target py-3.5 px-4 rounded-2xl bg-oled-900 hover:bg-oled-800 border border-dashed border-oled-600 text-emerald-400 font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.99] transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Ajouter un exercice à la séance</span>
+            </button>
+
+            <!-- Carte Récapitulatif Live & Validation Finale -->
+            <div class="bg-oled-900 border border-oled-700 rounded-2xl p-4 shadow-xl space-y-3">
+                <div class="grid grid-cols-3 gap-2 text-center bg-oled-950 rounded-xl p-2.5 border border-oled-800">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase text-zinc-500">Exercices</p>
+                        <p id="live-stat-exercises" class="text-base font-black text-white">0</p>
+                    </div>
+                    <div class="border-x border-oled-800">
+                        <p class="text-[10px] font-bold uppercase text-zinc-500">Séries Validées</p>
+                        <p id="live-stat-sets" class="text-base font-black text-emerald-400">0 / 0</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold uppercase text-zinc-500">Volume Total</p>
+                        <p id="live-stat-volume" class="text-base font-black text-indigo-400">0 kg</p>
+                    </div>
+                </div>
+
+                <button onclick="App.commitActiveWorkout()" class="w-full touch-target py-4 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base tracking-tight shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-[0.99] transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+                    <span id="commit-workout-btn-label">Terminer & Enregistrer la séance</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- 2. VUE HISTORIQUE DES ENTRAÎNEMENTS -->
+        <section id="view-history" class="hidden fade-in space-y-4">
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-3.5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-base font-extrabold text-white">Historique des Séances</h2>
+                    <span id="history-count-badge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-oled-800 text-emerald-400 border border-oled-700">0 séance</span>
+                </div>
+
+                <!-- Filtres : Recherche texte + Filtre par mois/date -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div class="relative">
+                        <input id="history-search-input" type="text" oninput="App.renderHistoryView()" placeholder="Filtrer par titre ou exercice..."
+                            class="w-full touch-target bg-oled-950 border border-oled-700 rounded-xl pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    </div>
+                    <div class="flex gap-2">
+                        <input id="history-month-filter" type="month" onchange="App.renderHistoryView()"
+                            class="flex-1 touch-target bg-oled-950 border border-oled-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <button onclick="App.clearHistoryFilters()" class="touch-target px-3 rounded-xl bg-oled-800 text-xs font-bold text-zinc-300 border border-oled-700">
+                            Tout
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Liste des séances enregistrées -->
+            <div id="history-list-container" class="space-y-3"></div>
+        </section>
+
+        <!-- 3. VUE ANALYTIQUE & SURCHARGE PROGRESSIVE -->
+        <section id="view-analytics" class="hidden fade-in space-y-4">
+            <!-- Sélecteur d'exercice -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-3.5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-base font-extrabold text-white">Analytique & Surcharge Progressive</h2>
+                    <span class="text-[11px] font-semibold text-zinc-400">Séries validées</span>
+                </div>
+                <div>
+                    <label for="analytics-exercise-select" class="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Choisir un exercice</label>
+                    <select id="analytics-exercise-select" onchange="App.renderAnalyticsView()"
+                        class="w-full touch-target bg-oled-950 border border-oled-700 rounded-xl px-3.5 py-2.5 text-white font-bold focus:outline-none focus:border-emerald-500">
+                    </select>
+                </div>
+
+                <!-- 3 Cartes KPI de l'exercice sélectionné -->
+                <div class="grid grid-cols-3 gap-2 pt-1">
+                    <div class="bg-oled-950 border border-oled-800 rounded-xl p-2.5">
+                        <p class="text-[10px] font-bold uppercase text-zinc-400">Charge Max (PR)</p>
+                        <p id="kpi-max-weight" class="text-lg font-black text-emerald-400 mt-0.5">— kg</p>
+                        <p id="kpi-max-weight-sub" class="text-[10px] text-zinc-500 truncate">Aucune donnée</p>
+                    </div>
+                    <div class="bg-oled-950 border border-oled-800 rounded-xl p-2.5">
+                        <p class="text-[10px] font-bold uppercase text-zinc-400">Record Volume</p>
+                        <p id="kpi-max-volume" class="text-lg font-black text-indigo-400 mt-0.5">— kg</p>
+                        <p id="kpi-max-volume-sub" class="text-[10px] text-zinc-500 truncate">Reps × Charge</p>
+                    </div>
+                    <div class="bg-oled-950 border border-oled-800 rounded-xl p-2.5">
+                        <p class="text-[10px] font-bold uppercase text-zinc-400">1RM Estimé</p>
+                        <p id="kpi-est-1rm" class="text-lg font-black text-amber-400 mt-0.5">— kg</p>
+                        <p class="text-[10px] text-zinc-500 truncate">Formule d'Epley</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graphique interactif Chart.js -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-3.5 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Évolution Charge Max & Volume</h3>
+                        <p class="text-[11px] text-zinc-400">Double axe : Charge max (kg) et Volume cumulé (kg)</p>
+                    </div>
+                    <div class="flex bg-oled-950 p-1 rounded-xl border border-oled-800 text-xs font-bold">
+                        <button id="chart-mode-both" onclick="App.setChartMode('both')" class="px-2.5 py-1 rounded-lg bg-oled-800 text-white">Combiné</button>
+                        <button id="chart-mode-weight" onclick="App.setChartMode('weight')" class="px-2.5 py-1 rounded-lg text-zinc-400">Charge</button>
+                        <button id="chart-mode-volume" onclick="App.setChartMode('volume')" class="px-2.5 py-1 rounded-lg text-zinc-400">Volume</button>
+                    </div>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="progression-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tableau récapitulatif chronologique par séance -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl overflow-hidden">
+                <div class="p-3.5 border-b border-oled-800 flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-white">Historique détaillé de l'exercice</h3>
+                    <span id="analytics-sessions-count" class="text-xs text-zinc-400">0 séance</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-oled-950 text-zinc-400 uppercase text-[10px] tracking-wider border-b border-oled-800">
+                                <th class="py-2.5 px-3 font-bold">Date</th>
+                                <th class="py-2.5 px-3 font-bold">Meilleure série</th>
+                                <th class="py-2.5 px-3 font-bold text-right">Volume cumulé</th>
+                                <th class="py-2.5 px-3 font-bold text-right">Charge moy.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analytics-table-body" class="divide-y divide-oled-800 text-zinc-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. VUE DONNÉES & SAUVEGARDE DOSSIER IPHONE -->
+        <section id="view-data" class="hidden fade-in space-y-4">
+            <!-- État de la base locale -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-extrabold text-white">Stockage Local & Dossier iPhone</h2>
+                        <p class="text-xs text-zinc-400">Persistance locale IndexedDB + Synchronisation Fichiers iOS</p>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">100% Hors-ligne</span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 bg-oled-950 border border-oled-800 rounded-xl p-3 text-center">
+                    <div>
+                        <p class="text-[10px] uppercase font-bold text-zinc-500">Séances</p>
+                        <p id="storage-stat-workouts" class="text-lg font-black text-white">0</p>
+                    </div>
+                    <div class="border-x border-oled-800">
+                        <p class="text-[10px] uppercase font-bold text-zinc-500">Séries Totales</p>
+                        <p id="storage-stat-sets" class="text-lg font-black text-emerald-400">0</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] uppercase font-bold text-zinc-500">Taille Base</p>
+                        <p id="storage-stat-size" class="text-lg font-black text-indigo-400">0 Ko</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exportation vers l'application Fichiers de l'iPhone -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-4 space-y-3">
+                <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Sauvegarder dans les Fichiers de l'iPhone</h3>
+                        <p class="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+                            Génère le fichier <code class="text-emerald-400 font-mono">workouts_backup.json</code> contenant l'intégralité de tes séances. Sur iPhone, choisis <strong>« Enregistrer dans Fichiers »</strong> pour le stocker dans ton dossier personnel.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <button onclick="App.exportBackupJSON(true)" class="touch-target py-3.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/15 active:scale-95 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                        <span>Partager vers Fichiers iPhone (iOS)</span>
+                    </button>
+                    <button onclick="App.exportBackupJSON(false)" class="touch-target py-3.5 px-4 rounded-xl bg-oled-800 hover:bg-oled-700 border border-oled-700 text-zinc-100 font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>Télécharger workouts_backup.json</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Restauration / Import depuis un fichier JSON -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-4 space-y-3">
+                <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Restaurer / Importer une sauvegarde JSON</h3>
+                        <p class="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+                            Charge un fichier <code class="text-indigo-400 font-mono">workouts_backup.json</code> depuis ton dossier iPhone pour restaurer ou fusionner ton historique.
+                        </p>
+                    </div>
+                </div>
+
+                <label class="w-full touch-target py-3.5 px-4 rounded-xl bg-oled-950 hover:bg-oled-800 border border-dashed border-indigo-500/50 text-indigo-300 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span>Sélectionner workouts_backup.json depuis l'iPhone</span>
+                    <input id="import-json-input" type="file" accept=".json,application/json" onchange="App.handleImportJSON(event)" class="hidden">
+                </label>
+            </div>
+
+            <!-- Données de démonstration (4 semaines) & Réinitialisation -->
+            <div class="bg-oled-900 border border-oled-800 rounded-2xl p-4 space-y-3">
+                <h3 class="text-sm font-bold text-white">Outils & Données de test</h3>
+                <p class="text-xs text-zinc-400">
+                    Tu peux générer 4 semaines d'historique réaliste basées sur tes charges (DC Haltères 20→24 kg, Squat 80→90 kg, Tirage 45→52.5 kg) pour tester immédiatement les graphiques de surcharge progressive.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button onclick="App.seedDemoData()" class="touch-target py-3 px-4 rounded-xl bg-oled-800 hover:bg-oled-700 border border-oled-700 text-xs font-bold text-emerald-400 flex items-center justify-center gap-2">
+                        <span>⚡ Charger 4 semaines de démo</span>
+                    </button>
+                    <button onclick="App.confirmClearAllData()" class="touch-target py-3 px-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs font-bold text-rose-400 flex items-center justify-center gap-2">
+                        <span>Supprimer toutes les données</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ================= BARRE DE NAVIGATION INFÉRIEURE (iOS TAB BAR) ================= -->
+    <nav class="fixed bottom-0 inset-x-0 z-30 bg-oled-950/95 backdrop-blur-lg border-t border-oled-800 pb-safe">
+        <div class="max-w-2xl mx-auto grid grid-cols-4 px-2 pt-1.5 pb-1">
+            <button id="tab-btn-workout" onclick="App.switchTab('workout')" class="touch-target flex flex-col items-center justify-center py-1 rounded-xl text-emerald-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></svg>
+                <span class="text-[11px] font-bold">Séance</span>
+            </button>
+
+            <button id="tab-btn-history" onclick="App.switchTab('history')" class="touch-target flex flex-col items-center justify-center py-1 rounded-xl text-zinc-500 hover:text-zinc-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                <span class="text-[11px] font-bold">Historique</span>
+            </button>
+
+            <button id="tab-btn-analytics" onclick="App.switchTab('analytics')" class="touch-target flex flex-col items-center justify-center py-1 rounded-xl text-zinc-500 hover:text-zinc-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                <span class="text-[11px] font-bold">Analytique</span>
+            </button>
+
+            <button id="tab-btn-data" onclick="App.switchTab('data')" class="touch-target flex flex-col items-center justify-center py-1 rounded-xl text-zinc-500 hover:text-zinc-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                <span class="text-[11px] font-bold">Fichiers iOS</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ================= MODALE D'AJOUT D'EXERCICE ================= -->
+    <div id="exercise-picker-modal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-oled-900 border-t sm:border border-oled-700 rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden fade-in">
+            <div class="p-4 border-b border-oled-800 flex items-center justify-between">
+                <h3 class="text-base font-extrabold text-white">Ajouter un exercice</h3>
+                <button onclick="App.closeExercisePickerModal()" class="touch-target px-3 py-1 rounded-xl bg-oled-800 text-zinc-400 font-bold text-xs">Fermer</button>
+            </div>
+            <div class="p-3.5 space-y-3 overflow-y-auto">
+                <!-- Création d'exercice personnalisé -->
+                <div class="flex gap-2">
+                    <input id="custom-exercise-input" type="text" placeholder="Nouvel exercice personnalisé..."
+                        class="flex-1 touch-target bg-oled-950 border border-oled-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    <button onclick="App.addCustomExerciseFromModal()" class="touch-target px-4 rounded-xl bg-emerald-500 text-zinc-950 font-extrabold text-xs shrink-0">
+                        + Créer
+                    </button>
+                </div>
+
+                <!-- Liste du catalogue du programme -->
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2">Catalogue du programme (8 semaines)</p>
+                    <div id="modal-exercise-catalog" class="space-y-1.5"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODALE GÉNÉRIQUE DE CONFIRMATION / DÉTAILS ================= -->
+    <div id="dialog-modal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div id="dialog-modal-content" class="bg-oled-900 border border-oled-700 rounded-3xl max-w-md w-full p-5 space-y-4 fade-in shadow-2xl"></div>
+    </div>
+
+    <!-- ================= TOAST NOTIFICATION ================= -->
+    <div id="toast-banner" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-200 px-4 py-2.5 rounded-2xl bg-emerald-500 text-zinc-950 font-extrabold text-xs shadow-xl flex items-center gap-2">
+        <span id="toast-text">Action effectuée</span>
+    </div>
+
+    <!-- ================= LOGIQUE JAVASCRIPT MODULAIRE ================= -->
+    <script>
+        /**
+         * Catalogue officiel issu du programme Half-Body 8 semaines
+         */
+        const PROGRAM_TEMPLATES = {
+            s1: {
+                title: "Séance 1 : Haut du corps (Force/Volume)",
+                exercises: [
+                    { name: "Développé couché aux haltères", targetNotes: "4 × 6-8 reps • Repos 2-3m", setsCount: 4, defaultReps: 8, defaultWeight: 20 },
+                    { name: "Tirage vertical (poulie haute)", targetNotes: "4 × 8-10 reps • Repos 2m", setsCount: 4, defaultReps: 10, defaultWeight: 45 },
+                    { name: "Développé épaules (haltères ou machine)", targetNotes: "3 × 8-10 reps • Repos 2m", setsCount: 3, defaultReps: 10, defaultWeight: 14 },
+                    { name: "Face-pull à la poulie", targetNotes: "3 × 12-15 reps • Posture épaules", setsCount: 3, defaultReps: 15, defaultWeight: 20 },
+                    { name: "Curl biceps (barre ou haltères)", targetNotes: "3 × 10-12 reps • Repos 1m30", setsCount: 3, defaultReps: 12, defaultWeight: 12 },
+                    { name: "Extensions triceps (poulie)", targetNotes: "3 × 10-12 reps • Repos 1m30", setsCount: 3, defaultReps: 12, defaultWeight: 20 }
+                ]
+            },
+            s2: {
+                title: "Séance 2 : Bas du corps (Focus Squat)",
+                exercises: [
+                    { name: "Squat barre libre", targetNotes: "4 × 5-8 reps • Repos 3m", setsCount: 4, defaultReps: 6, defaultWeight: 80 },
+                    { name: "Presse à cuisses", targetNotes: "3 × 10-12 reps • Repos 2m", setsCount: 3, defaultReps: 12, defaultWeight: 120 },
+                    { name: "Leg curl (assis ou allongé)", targetNotes: "3 × 10-12 reps • Contrôle excentrique", setsCount: 3, defaultReps: 12, defaultWeight: 40 },
+                    { name: "Extensions mollets (debout ou presse)", targetNotes: "4 × 12-15 reps • Repos 1m30", setsCount: 4, defaultReps: 15, defaultWeight: 50 },
+                    { name: "Gainage (Planche)", targetNotes: "3 × 45-60 sec • Repos 1m30", setsCount: 3, defaultReps: 60, defaultWeight: 0 }
+                ]
+            },
+            s3: {
+                title: "Séance 3 : Haut du corps (Variations)",
+                exercises: [
+                    { name: "Développé incliné (haltères ou machine)", targetNotes: "4 × 8-10 reps • Banc 30°", setsCount: 4, defaultReps: 10, defaultWeight: 18 },
+                    { name: "Tirage horizontal (rowing poulie basse)", targetNotes: "4 × 8-10 reps • Omoplates serrées", setsCount: 4, defaultReps: 10, defaultWeight: 45 },
+                    { name: "Élévations latérales (haltères ou poulie)", targetNotes: "4 × 12-15 reps • Repos 1m30", setsCount: 4, defaultReps: 15, defaultWeight: 8 },
+                    { name: "Oiseau (arrière d'épaule)", targetNotes: "3 × 12-15 reps • Deltoïde postérieur", setsCount: 3, defaultReps: 15, defaultWeight: 8 },
+                    { name: "Curl marteau haltères", targetNotes: "3 × 10-15 reps • Superset Bras", setsCount: 3, defaultReps: 12, defaultWeight: 12 },
+                    { name: "Extension triceps corde", targetNotes: "3 × 10-15 reps • Superset Bras", setsCount: 3, defaultReps: 12, defaultWeight: 18 }
+                ]
+            },
+            s4: {
+                title: "Séance 4 : Bas du corps (Chaîne postérieure)",
+                exercises: [
+                    { name: "Soulevé de terre roumain (barre ou haltères)", targetNotes: "4 × 8-10 reps • Étirement ischios", setsCount: 4, defaultReps: 10, defaultWeight: 60 },
+                    { name: "Fentes bulgares ou presse unilatérale", targetNotes: "3 × 8-10 reps / jambe", setsCount: 3, defaultReps: 10, defaultWeight: 14 },
+                    { name: "Leg extension", targetNotes: "3 × 12-15 reps • Contraction 1s en haut", setsCount: 3, defaultReps: 15, defaultWeight: 45 },
+                    { name: "Extensions mollets (debout ou presse)", targetNotes: "4 × 12-15 reps • Sans rebond", setsCount: 4, defaultReps: 15, defaultWeight: 50 },
+                    { name: "Crunch à la poulie haute", targetNotes: "3 × 12-15 reps • Enroulement vertébral", setsCount: 3, defaultReps: 15, defaultWeight: 30 }
+                ]
+            }
+        };
+
+        const DEFAULT_EXERCISES_CATALOG = [
+            "Développé couché aux haltères",
+            "Tirage vertical (poulie haute)",
+            "Développé épaules (haltères ou machine)",
+            "Face-pull à la poulie",
+            "Curl biceps (barre ou haltères)",
+            "Extensions triceps (poulie)",
+            "Squat barre libre",
+            "Presse à cuisses",
+            "Leg curl (assis ou allongé)",
+            "Extensions mollets (debout ou presse)",
+            "Gainage (Planche)",
+            "Développé incliné (haltères ou machine)",
+            "Tirage horizontal (rowing poulie basse)",
+            "Élévations latérales (haltères ou poulie)",
+            "Oiseau (arrière d'épaule)",
+            "Curl marteau haltères",
+            "Extension triceps corde",
+            "Soulevé de terre roumain (barre ou haltères)",
+            "Fentes bulgares ou presse unilatérale",
+            "Leg extension",
+            "Crunch à la poulie haute"
+        ];
+
+        /**
+         * Couche de persistance hybride : IndexedDB principale + Fallback localStorage
+         */
+        const StorageEngine = {
+            dbName: 'GymTrackerDB',
+            storeName: 'workouts',
+            db: null,
+            fallbackKey: 'gymtracker_idb_fallback_v2',
+            draftKey: 'active_workout_draft_v2',
+            customExKey: 'gymtracker_custom_exercises_v2',
+
+            async init() {
+                if (!window.indexedDB) return false;
+                return new Promise((resolve) => {
+                    try {
+                        const request = indexedDB.open(this.dbName, 1);
+                        request.onupgradeneeded = (e) => {
+                            const db = e.target.result;
+                            if (!db.objectStoreNames.contains(this.storeName)) {
+                                const store = db.createObjectStore(this.storeName, { keyPath: 'id' });
+                                store.createIndex('date', 'date', { unique: false });
+                            }
+                        };
+                        request.onsuccess = (e) => {
+                            this.db = e.target.result;
+                            resolve(true);
+                        };
+                        request.onerror = () => resolve(false);
+                    } catch (err) {
+                        resolve(false);
+                    }
+                });
+            },
+
+            async getAllWorkouts() {
+                if (this.db) {
+                    return new Promise((resolve) => {
+                        const tx = this.db.transaction(this.storeName, 'readonly');
+                        const store = tx.objectStore(this.storeName);
+                        const req = store.getAll();
+                        req.onsuccess = () => {
+                            const list = req.result || [];
+                            list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.updatedAt || 0) - (a.updatedAt || 0));
+                            resolve(list);
+                        };
+                        req.onerror = () => resolve(this.getFallbackWorkouts());
+                    });
+                }
+                return this.getFallbackWorkouts();
+            },
+
+            getFallbackWorkouts() {
+                try {
+                    const raw = localStorage.getItem(this.fallbackKey);
+                    const list = raw ? JSON.parse(raw) : [];
+                    return list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+                } catch (e) {
+                    return [];
+                }
+            },
+
+            async saveWorkout(workout) {
+                workout.updatedAt = Date.now();
+                // Sauvegarde miroir dans localStorage pour redondance maximale sur iOS
+                const currentFallback = this.getFallbackWorkouts().filter(w => w.id !== workout.id);
+                currentFallback.push(workout);
+                try {
+                    localStorage.setItem(this.fallbackKey, JSON.stringify(currentFallback));
+                } catch (e) {}
+
+                if (this.db) {
+                    return new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        store.put(workout);
+                        tx.oncomplete = () => resolve(true);
+                        tx.onerror = (err) => reject(err);
+                    });
+                }
+                return true;
+            },
+
+            async deleteWorkout(id) {
+                const filtered = this.getFallbackWorkouts().filter(w => w.id !== id);
+                try {
+                    localStorage.setItem(this.fallbackKey, JSON.stringify(filtered));
+                } catch (e) {}
+
+                if (this.db) {
+                    return new Promise((resolve) => {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        tx.objectStore(this.storeName).delete(id);
+                        tx.oncomplete = () => resolve(true);
+                        tx.onerror = () => resolve(false);
+                    });
+                }
+                return true;
+            },
+
+            async clearAll() {
+                localStorage.removeItem(this.fallbackKey);
+                localStorage.removeItem(this.draftKey);
+                if (this.db) {
+                    return new Promise((resolve) => {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        tx.objectStore(this.storeName).clear();
+                        tx.oncomplete = () => resolve(true);
+                    });
+                }
+            },
+
+            saveDraft(workout) {
+                try {
+                    localStorage.setItem(this.draftKey, JSON.stringify(workout));
+                } catch (e) {}
+            },
+
+            loadDraft() {
+                try {
+                    const raw = localStorage.getItem(this.draftKey);
+                    return raw ? JSON.parse(raw) : null;
+                } catch (e) {
+                    return null;
+                }
+            },
+
+            getCustomExercises() {
+                try {
+                    const raw = localStorage.getItem(this.customExKey);
+                    return raw ? JSON.parse(raw) : [];
+                } catch (e) {
+                    return [];
+                }
+            },
+
+            addCustomExercise(name) {
+                const list = this.getCustomExercises();
+                if (!list.includes(name) && !DEFAULT_EXERCISES_CATALOG.includes(name)) {
+                    list.push(name);
+                    localStorage.setItem(this.customExKey, JSON.stringify(list));
+                }
+            }
+        };
+
+        /**
+         * Contrôleur Principal de l'Application
+         */
+        const App = {
+            currentTab: 'workout',
+            workouts: [],
+            activeWorkout: null,
+            isEditingExisting: false,
+            chartInstance: null,
+            chartMode: 'both',
+            restTimerInterval: null,
+            restSecondsRemaining: 0,
+
+            async init() {
+                await StorageEngine.init();
+                this.workouts = await StorageEngine.getAllWorkouts();
+
+                // Charger le brouillon auto-sauvegardé ou initialiser la Séance 1 par défaut
+                const savedDraft = StorageEngine.loadDraft();
+                if (savedDraft && savedDraft.exercises && savedDraft.exercises.length > 0) {
+                    this.activeWorkout = savedDraft;
+                    this.isEditingExisting = !!savedDraft.isEditingExisting;
+                } else {
+                    this.createWorkoutFromTemplate('s1', false);
+                }
+
+                this.renderActiveWorkout();
+            },
+
+            todayISO() {
+                const now = new Date();
+                const offset = now.getTimezoneOffset() * 60000;
+                return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+            },
+
+            uid(prefix = 'id') {
+                return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+            },
+
+            parseDecimal(val) {
+                if (typeof val === 'number') return isNaN(val) ? 0 : val;
+                if (!val) return 0;
+                const normalized = String(val).replace(',', '.').replace(/[^0-9.-]/g, '');
+                const parsed = parseFloat(normalized);
+                return isNaN(parsed) ? 0 : Math.max(0, parsed);
+            },
+
+            parseIntSafe(val) {
+                if (typeof val === 'number') return isNaN(val) ? 0 : Math.round(val);
+                if (!val) return 0;
+                const parsed = parseInt(String(val).replace(/[^0-9]/g, ''), 10);
+                return isNaN(parsed) ? 0 : Math.max(0, parsed);
+            },
+
+            escapeHTML(str) {
+                return String(str || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            },
+
+            /**
+             * Récupère la dernière performance enregistrée pour un exercice donné
+             */
+            getLastExercisePerformance(exerciseName) {
+                for (const w of this.workouts) {
+                    if (this.isEditingExisting && this.activeWorkout && w.id === this.activeWorkout.id) continue;
+                    const foundEx = (w.exercises || []).find(e => e.name.toLowerCase() === exerciseName.toLowerCase());
+                    if (foundEx && foundEx.sets && foundEx.sets.length > 0) {
+                        const validSets = foundEx.sets.filter(s => s.valide);
+                        return {
+                            date: w.date,
+                            sets: validSets.length > 0 ? validSets : foundEx.sets
+                        };
+                    }
+                }
+                return null;
+            },
+
+            createWorkoutFromTemplate(templateKey, notify = true) {
+                const tpl = PROGRAM_TEMPLATES[templateKey];
+                this.isEditingExisting = false;
+
+                if (!tpl || templateKey === 'empty') {
+                    this.activeWorkout = {
+                        id: this.uid('wk'),
+                        date: this.todayISO(),
+                        title: "Séance Libre",
+                        exercises: []
+                    };
+                } else {
+                    const exercises = tpl.exercises.map(item => {
+                        const lastPerf = this.getLastExercisePerformance(item.name);
+                        const sets = [];
+                        for (let i = 1; i <= item.setsCount; i++) {
+                            const prevSet = lastPerf && lastPerf.sets[i - 1] ? lastPerf.sets[i - 1] : (lastPerf && lastPerf.sets[lastPerf.sets.length - 1]);
+                            sets.push({
+                                set_index: i,
+                                weight: prevSet ? prevSet.weight : item.defaultWeight,
+                                reps: prevSet ? prevSet.reps : item.defaultReps,
+                                prevHint: prevSet ? `${prevSet.weight}kg × ${prevSet.reps}` : `${item.defaultWeight}kg × ${item.defaultReps}`,
+                                valide: false
+                            });
+                        }
+                        return {
+                            id: this.uid('ex'),
+                            name: item.name,
+                            targetNotes: item.targetNotes,
+                            sets
+                        };
+                    });
+
+                    this.activeWorkout = {
+                        id: this.uid('wk'),
+                        date: this.todayISO(),
+                        title: tpl.title,
+                        exercises
+                    };
+                }
+
+                this.triggerAutoSave();
+                this.renderActiveWorkout();
+                if (notify) this.showToast(`Modèle « ${this.activeWorkout.title} » chargé`);
+            },
+
+            loadTemplate(templateKey) {
+                const hasValidatedSets = this.activeWorkout && (this.activeWorkout.exercises || []).some(ex => ex.sets.some(s => s.valide));
+                if (hasValidatedSets) {
+                    this.openDialogModal({
+                        title: "Remplacer la séance en cours ?",
+                        message: "Tu as déjà validé des séries dans cette séance. Charger un nouveau modèle remplacera ton brouillon actuel.",
+                        confirmText: "Charger le modèle",
+                        confirmClass: "bg-emerald-500 text-zinc-950",
+                        onConfirm: () => this.createWorkoutFromTemplate(templateKey, true)
+                    });
+                } else {
+                    this.createWorkoutFromTemplate(templateKey, true);
+                }
+            },
+
+            resetToNewWorkout() {
+                this.createWorkoutFromTemplate('s1', true);
+            },
+
+            triggerAutoSave() {
+                if (!this.activeWorkout) return;
+                this.activeWorkout.isEditingExisting = this.isEditingExisting;
+                StorageEngine.saveDraft(this.activeWorkout);
+                this.updateLiveSummaryStats();
+
+                const indicator = document.getElementById('autosave-indicator');
+                if (indicator) {
+                    const timeStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    indicator.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span><span>Sauvegardé à ${timeStr}</span>`;
+                }
+            },
+
+            updateWorkoutMeta() {
+                if (!this.activeWorkout) return;
+                const titleInput = document.getElementById('workout-title-input');
+                const dateInput = document.getElementById('workout-date-input');
+                this.activeWorkout.title = titleInput.value.trim() || "Séance de musculation";
+                this.activeWorkout.date = dateInput.value || this.todayISO();
+                this.triggerAutoSave();
+            },
+
+            /**
+             * Rendu complet de la vue Séance en Direct
+             */
+            renderActiveWorkout() {
+                if (!this.activeWorkout) return;
+
+                document.getElementById('workout-title-input').value = this.activeWorkout.title || '';
+                document.getElementById('workout-date-input').value = this.activeWorkout.date || this.todayISO();
+
+                const editBanner = document.getElementById('edit-mode-banner');
+                const commitLabel = document.getElementById('commit-workout-btn-label');
+                if (this.isEditingExisting) {
+                    editBanner.classList.remove('hidden');
+                    commitLabel.textContent = "Mettre à jour la séance dans l'historique";
+                } else {
+                    editBanner.classList.add('hidden');
+                    commitLabel.textContent = "Terminer & Enregistrer la séance";
+                }
+
+                const container = document.getElementById('workout-exercises-container');
+                if (!this.activeWorkout.exercises || this.activeWorkout.exercises.length === 0) {
+                    container.innerHTML = `
+                        <div class="bg-oled-900 border border-oled-800 rounded-2xl p-8 text-center space-y-2">
+                            <p class="text-sm font-bold text-zinc-300">Aucun exercice dans cette séance</p>
+                            <p class="text-xs text-zinc-500">Sélectionne une séance type ci-dessus ou clique sur « Ajouter un exercice ».</p>
+                        </div>
+                    `;
+                    this.updateLiveSummaryStats();
+                    return;
+                }
+
+                container.innerHTML = this.activeWorkout.exercises.map((ex, exIdx) => {
+                    const lastPerf = this.getLastExercisePerformance(ex.name);
+                    const lastPerfBanner = lastPerf
+                        ? `<span class="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg">Dernière (${lastPerf.date}) : ${lastPerf.sets[0].weight}kg × ${lastPerf.sets[0].reps}</span>`
+                        : '';
+
+                    const setsRows = (ex.sets || []).map((set, setIdx) => {
+                        const rowBg = set.valide ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-oled-950 border-oled-800';
+                        const checkBtnStyle = set.valide
+                            ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-md shadow-emerald-500/20'
+                            : 'bg-oled-800 text-zinc-400 border-oled-700 hover:text-white';
+
+                        return `
+                            <div class="grid grid-cols-12 gap-1.5 items-center p-1.5 rounded-xl border ${rowBg} transition-colors">
+                                <!-- Index Série -->
+                                <div class="col-span-2 flex flex-col items-center justify-center">
+                                    <span class="text-xs font-black ${set.valide ? 'text-emerald-400' : 'text-zinc-400'}">#${set.set_index}</span>
+                                    <span class="text-[9px] text-zinc-500 truncate max-w-full">${this.escapeHTML(set.prevHint || '—')}</span>
+                                </div>
+
+                                <!-- Saisie Poids (kg) - Clavier décimal iOS -->
+                                <div class="col-span-3">
+                                    <div class="relative">
+                                        <input type="text" inputmode="decimal" value="${set.weight}"
+                                            aria-label="Poids série ${set.set_index}"
+                                            oninput="App.onSetFieldInput(${exIdx}, ${setIdx}, 'weight', this.value)"
+                                            class="w-full touch-target bg-oled-900 border border-oled-700 rounded-xl px-2 py-2 text-center font-black text-white focus:outline-none focus:border-emerald-500">
+                                        <span class="text-[9px] font-bold text-zinc-500 absolute right-1.5 bottom-1 pointer-events-none">kg</span>
+                                    </div>
+                                </div>
+
+                                <!-- Saisie Répétitions - Clavier numérique iOS -->
+                                <div class="col-span-3">
+                                    <div class="relative">
+                                        <input type="text" inputmode="numeric" value="${set.reps}"
+                                            aria-label="Répétitions série ${set.set_index}"
+                                            oninput="App.onSetFieldInput(${exIdx}, ${setIdx}, 'reps', this.value)"
+                                            class="w-full touch-target bg-oled-900 border border-oled-700 rounded-xl px-2 py-2 text-center font-black text-white focus:outline-none focus:border-emerald-500">
+                                        <span class="text-[9px] font-bold text-zinc-500 absolute right-1.5 bottom-1 pointer-events-none">reps</span>
+                                    </div>
+                                </div>
+
+                                <!-- Bouton Validation Série (>= 44x44px) -->
+                                <div class="col-span-2 flex justify-center">
+                                    <button type="button" onclick="App.toggleSetValidated(${exIdx}, ${setIdx})"
+                                        class="touch-target w-full rounded-xl border font-black flex items-center justify-center active:scale-95 transition ${checkBtnStyle}"
+                                        title="Valider la série">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+                                    </button>
+                                </div>
+
+                                <!-- Suppression Série (>= 44x44px) -->
+                                <div class="col-span-2 flex justify-center">
+                                    <button type="button" onclick="App.removeSet(${exIdx}, ${setIdx})"
+                                        class="touch-target w-full rounded-xl bg-oled-900 hover:bg-rose-500/15 text-zinc-500 hover:text-rose-400 border border-oled-800 flex items-center justify-center active:scale-95 transition"
+                                        title="Supprimer cette série">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `
+                        <article class="bg-oled-900 border border-oled-800 rounded-2xl p-3.5 space-y-3 shadow-md">
+                            <!-- En-tête de l'exercice -->
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs font-black px-2 py-0.5 rounded-md bg-oled-800 text-emerald-400 border border-oled-700">${exIdx + 1}</span>
+                                        <h3 class="text-sm font-extrabold text-white leading-snug">${this.escapeHTML(ex.name)}</h3>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        ${ex.targetNotes ? `<span class="text-[11px] text-zinc-400">${this.escapeHTML(ex.targetNotes)}</span>` : ''}
+                                        ${lastPerfBanner}
+                                    </div>
+                                </div>
+
+                                <button type="button" onclick="App.removeExerciseFromActive(${exIdx})"
+                                    class="touch-target px-2.5 rounded-xl bg-oled-950 hover:bg-rose-500/15 text-zinc-400 hover:text-rose-400 border border-oled-800 flex items-center justify-center shrink-0"
+                                    title="Retirer l'exercice">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                </button>
+                            </div>
+
+                            <!-- Légende des colonnes -->
+                            <div class="grid grid-cols-12 gap-1.5 px-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 text-center">
+                                <div class="col-span-2">Série</div>
+                                <div class="col-span-3">Charge (kg)</div>
+                                <div class="col-span-3">Reps</div>
+                                <div class="col-span-2">Valider</div>
+                                <div class="col-span-2">Retirer</div>
+                            </div>
+
+                            <!-- Liste des séries -->
+                            <div class="space-y-2">
+                                ${setsRows}
+                            </div>
+
+                            <!-- Bouton Ajouter une série -->
+                            <button type="button" onclick="App.addSetToExercise(${exIdx})"
+                                class="w-full touch-target py-2.5 rounded-xl bg-oled-950 hover:bg-oled-800 border border-oled-800 text-xs font-bold text-zinc-300 flex items-center justify-center gap-1.5 active:scale-[0.99] transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                                <span>Ajouter une série (#${(ex.sets ? ex.sets.length : 0) + 1})</span>
+                            </button>
+                        </article>
+                    `;
+                }).join('');
+
+                this.updateLiveSummaryStats();
+            },
+
+            onSetFieldInput(exIdx, setIdx, field, rawValue) {
+                const ex = this.activeWorkout.exercises[exIdx];
+                if (!ex || !ex.sets[setIdx]) return;
+
+                if (field === 'weight') {
+                    ex.sets[setIdx].weight = this.parseDecimal(rawValue);
+                } else if (field === 'reps') {
+                    ex.sets[setIdx].reps = this.parseIntSafe(rawValue);
+                }
+                this.triggerAutoSave();
+            },
+
+            toggleSetValidated(exIdx, setIdx) {
+                const ex = this.activeWorkout.exercises[exIdx];
+                if (!ex || !ex.sets[setIdx]) return;
+
+                ex.sets[setIdx].valide = !ex.sets[setIdx].valide;
+                this.triggerAutoSave();
+                this.renderActiveWorkout();
+
+                // Déclenche automatiquement le chronomètre de repos à la validation d'une série
+                if (ex.sets[setIdx].valide) {
+                    const isCompound = setIdx === 0 || (ex.targetNotes && (ex.targetNotes.includes('2-3m') || ex.targetNotes.includes('3m') || ex.targetNotes.includes('2m')));
+                    this.startRestTimer(isCompound ? 150 : 90);
+                }
+            },
+
+            addSetToExercise(exIdx) {
+                const ex = this.activeWorkout.exercises[exIdx];
+                if (!ex) return;
+                const lastSet = ex.sets.length > 0 ? ex.sets[ex.sets.length - 1] : { weight: 20, reps: 10, prevHint: '—' };
+                ex.sets.push({
+                    set_index: ex.sets.length + 1,
+                    weight: lastSet.weight,
+                    reps: lastSet.reps,
+                    prevHint: lastSet.prevHint || `${lastSet.weight}kg × ${lastSet.reps}`,
+                    valide: false
+                });
+                this.triggerAutoSave();
+                this.renderActiveWorkout();
+            },
+
+            removeSet(exIdx, setIdx) {
+                const ex = this.activeWorkout.exercises[exIdx];
+                if (!ex) return;
+                ex.sets.splice(setIdx, 1);
+                // Ré-indexer proprement set_index (1, 2, 3...)
+                ex.sets.forEach((s, idx) => { s.set_index = idx + 1; });
+                this.triggerAutoSave();
+                this.renderActiveWorkout();
+            },
+
+            removeExerciseFromActive(exIdx) {
+                this.activeWorkout.exercises.splice(exIdx, 1);
+                this.triggerAutoSave();
+                this.renderActiveWorkout();
+            },
+
+            updateLiveSummaryStats() {
+                if (!this.activeWorkout) return;
+                const exercisesCount = (this.activeWorkout.exercises || []).length;
+                let totalSets = 0;
+                let validSets = 0;
+                let totalVolume = 0;
+
+                (this.activeWorkout.exercises || []).forEach(ex => {
+                    (ex.sets || []).forEach(s => {
+                        totalSets++;
+                        if (s.valide) {
+                            validSets++;
+                            totalVolume += (this.parseDecimal(s.weight) * this.parseIntSafe(s.reps));
+                        }
+                    });
+                });
+
+                document.getElementById('live-stat-exercises').textContent = exercisesCount;
+                document.getElementById('live-stat-sets').textContent = `${validSets} / ${totalSets}`;
+                document.getElementById('live-stat-volume').textContent = `${Math.round(totalVolume).toLocaleString('fr-FR')} kg`;
+            },
+
+            /**
+             * Modale de sélection / création d'exercice
+             */
+            openExercisePickerModal() {
+                const allExercises = [...DEFAULT_EXERCISES_CATALOG, ...StorageEngine.getCustomExercises()];
+                const container = document.getElementById('modal-exercise-catalog');
+                container.innerHTML = allExercises.map(name => `
+                    <button type="button" onclick="App.addExerciseToActive('${this.escapeHTML(name).replace(/'/g, "\\'")}')"
+                        class="w-full touch-target px-3.5 py-2.5 rounded-xl bg-oled-950 hover:bg-oled-800 border border-oled-800 text-left text-xs font-bold text-zinc-200 flex items-center justify-between active:scale-[0.99] transition">
+                        <span>${this.escapeHTML(name)}</span>
+                        <span class="text-emerald-400 text-sm font-black">+ Ajouter</span>
+                    </button>
+                `).join('');
+                document.getElementById('custom-exercise-input').value = '';
+                document.getElementById('exercise-picker-modal').classList.remove('hidden');
+            },
+
+            closeExercisePickerModal() {
+                document.getElementById('exercise-picker-modal').classList.add('hidden');
+            },
+
+            addCustomExerciseFromModal() {
+                const input = document.getElementById('custom-exercise-input');
+                const name = input.value.trim();
+                if (!name) return;
+                StorageEngine.addCustomExercise(name);
+                this.addExerciseToActive(name);
+            },
+
+            addExerciseToActive(exerciseName) {
+                const lastPerf = this.getLastExercisePerformance(exerciseName);
+                const defaultSets = [1, 2, 3].map(idx => {
+                    const prev = lastPerf && lastPerf.sets[idx - 1] ? lastPerf.sets[idx - 1] : (lastPerf ? lastPerf.sets[0] : null);
+                    return {
+                        set_index: idx,
+                        weight: prev ? prev.weight : 20,
+                        reps: prev ? prev.reps : 10,
+                        prevHint: prev ? `${prev.weight}kg × ${prev.reps}` : '20kg × 10',
+                        valide: false
+                    };
+                });
+
+                this.activeWorkout.exercises.push({
+                    id: this.uid('ex'),
+                    name: exerciseName,
+                    targetNotes: "3 × 8-12 reps",
+                    sets: defaultSets
+                });
+
+                this.closeExercisePickerModal();
+                this.triggerAutoSave();
+                this.renderActiveWorkout();
+                this.showToast(`« ${exerciseName} » ajouté`);
+            },
+
+            /**
+             * Validation finale et sauvegarde de la séance dans IndexedDB
+             */
+            async commitActiveWorkout() {
+                if (!this.activeWorkout || !this.activeWorkout.exercises || this.activeWorkout.exercises.length === 0) {
+                    this.showToast("Ajoute au moins un exercice avant d'enregistrer", true);
+                    return;
+                }
+
+                // Si l'utilisateur n'a coché aucune série, on lui propose de valider toutes les séries remplies
+                const anyValidated = this.activeWorkout.exercises.some(ex => ex.sets.some(s => s.valide));
+                if (!anyValidated) {
+                    this.openDialogModal({
+                        title: "Valider toutes les séries saisies ?",
+                        message: "Aucune série n'a été cochée en vert. Veux-tu marquer toutes les séries de cette séance comme validées et l'enregistrer ?",
+                        confirmText: "Tout valider & Enregistrer",
+                        confirmClass: "bg-emerald-500 text-zinc-950",
+                        onConfirm: async () => {
+                            this.activeWorkout.exercises.forEach(ex => ex.sets.forEach(s => { s.valide = true; }));
+                            await this.finalizeSaveWorkout();
+                        }
+                    });
+                    return;
+                }
+
+                await this.finalizeSaveWorkout();
+            },
+
+            async finalizeSaveWorkout() {
+                const workoutToSave = JSON.parse(JSON.stringify(this.activeWorkout));
+                delete workoutToSave.isEditingExisting;
+
+                await StorageEngine.saveWorkout(workoutToSave);
+                this.workouts = await StorageEngine.getAllWorkouts();
+
+                // Préparer la séance suivante du cycle
+                this.isEditingExisting = false;
+                this.createWorkoutFromTemplate('s1', false);
+                this.showToast("Séance enregistrée dans ton historique !");
+                this.switchTab('history');
+            },
+
+            /**
+             * Chronomètre de repos avec signal sonore Web Audio API
+             */
+            toggleRestTimerPreset(seconds) {
+                this.startRestTimer(seconds);
+            },
+
+            startRestTimer(seconds) {
+                clearInterval(this.restTimerInterval);
+                this.restSecondsRemaining = seconds;
+                this.updateTimerUI();
+
+                this.restTimerInterval = setInterval(() => {
+                    this.restSecondsRemaining--;
+                    if (this.restSecondsRemaining <= 0) {
+                        clearInterval(this.restTimerInterval);
+                        this.restSecondsRemaining = 0;
+                        this.playTimerBeep();
+                        this.showToast("⏱️ Temps de repos terminé ! À toi de jouer.");
+                    }
+                    this.updateTimerUI();
+                }, 1000);
+            },
+
+            stopRestTimer() {
+                clearInterval(this.restTimerInterval);
+                this.restSecondsRemaining = 0;
+                this.updateTimerUI();
+            },
+
+            updateTimerUI() {
+                const label = document.getElementById('timer-label');
+                const btn = document.getElementById('timer-display-btn');
+                if (this.restSecondsRemaining > 0) {
+                    const m = Math.floor(this.restSecondsRemaining / 60);
+                    const s = this.restSecondsRemaining % 60;
+                    label.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+                    btn.className = "touch-target px-3 py-1.5 rounded-lg bg-emerald-500 text-zinc-950 flex items-center gap-1.5 text-xs font-mono font-black animate-pulse";
+                } else {
+                    label.textContent = "Repos";
+                    btn.className = "touch-target px-3 py-1.5 rounded-lg bg-oled-900 border border-oled-700 flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-400";
+                }
+            },
+
+            playTimerBeep() {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    [523.25, 659.25, 783.99].forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.14);
+                        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.12);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(ctx.currentTime + idx * 0.14);
+                        osc.stop(ctx.currentTime + idx * 0.14 + 0.13);
+                    });
+                } catch (e) {}
+            },
+
+            /**
+             * Navigation entre les 4 onglets iOS
+             */
+            async switchTab(tab) {
+                this.currentTab = tab;
+                const tabs = ['workout', 'history', 'analytics', 'data'];
+                tabs.forEach(t => {
+                    const view = document.getElementById(`view-${t}`);
+                    const btn = document.getElementById(`tab-btn-${t}`);
+                    if (t === tab) {
+                        view.classList.remove('hidden');
+                        btn.className = "touch-target flex flex-col items-center justify-center py-1 rounded-xl text-emerald-400";
+                    } else {
+                        view.classList.add('hidden');
+                        btn.className = "touch-target flex flex-col items-center justify-center py-1 rounded-xl text-zinc-500 hover:text-zinc-300";
+                    }
+                });
+
+                this.workouts = await StorageEngine.getAllWorkouts();
+
+                if (tab === 'workout') this.renderActiveWorkout();
+                if (tab === 'history') this.renderHistoryView();
+                if (tab === 'analytics') this.populateAnalyticsSelectorAndRender();
+                if (tab === 'data') this.renderDataStorageStats();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            /**
+             * 2. RENDU DE L'HISTORIQUE DES SÉANCES
+             */
+            clearHistoryFilters() {
+                document.getElementById('history-search-input').value = '';
+                document.getElementById('history-month-filter').value = '';
+                this.renderHistoryView();
+            },
+
+            renderHistoryView() {
+                const search = (document.getElementById('history-search-input').value || '').toLowerCase().trim();
+                const monthFilter = document.getElementById('history-month-filter').value || '';
+
+                const filtered = this.workouts.filter(w => {
+                    const matchesMonth = !monthFilter || (w.date && w.date.startsWith(monthFilter));
+                    const matchesSearch = !search ||
+                        (w.title || '').toLowerCase().includes(search) ||
+                        (w.exercises || []).some(ex => (ex.name || '').toLowerCase().includes(search));
+                    return matchesMonth && matchesSearch;
+                });
+
+                document.getElementById('history-count-badge').textContent = `${filtered.length} séance${filtered.length > 1 ? 's' : ''}`;
+                const container = document.getElementById('history-list-container');
+
+                if (filtered.length === 0) {
+                    container.innerHTML = `
+                        <div class="bg-oled-900 border border-oled-800 rounded-2xl p-8 text-center space-y-3">
+                            <p class="text-sm font-bold text-zinc-300">Aucune séance enregistrée</p>
+                            <p class="text-xs text-zinc-500">Enregistre ta première séance dans l'onglet « Séance » ou charge les données de démonstration dans « Fichiers iOS ».</p>
+                            <button onclick="App.seedDemoData()" class="touch-target px-4 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-bold">
+                                ⚡ Charger 4 semaines d'exemple
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = filtered.map(w => {
+                    let workoutVolume = 0;
+                    let validSetsCount = 0;
+                    (w.exercises || []).forEach(ex => {
+                        (ex.sets || []).forEach(s => {
+                            if (s.valide) {
+                                validSetsCount++;
+                                workoutVolume += (this.parseDecimal(s.weight) * this.parseIntSafe(s.reps));
+                            }
+                        });
+                    });
+
+                    const formattedDate = new Date(w.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                        weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+                    });
+
+                    const exercisesHtml = (w.exercises || []).map(ex => {
+                        const setsBadges = (ex.sets || []).map(s => {
+                            const badgeStyle = s.valide
+                                ? 'bg-oled-950 text-zinc-100 border-emerald-500/40'
+                                : 'bg-oled-950 text-zinc-500 border-oled-800 line-through';
+                            return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-mono ${badgeStyle}">
+                                <strong class="text-emerald-400">S${s.set_index}:</strong> ${s.reps}×${s.weight}kg
+                            </span>`;
+                        }).join('');
+
+                        return `
+                            <div class="bg-oled-950/70 border border-oled-800 rounded-xl p-2.5 space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-xs font-bold text-white">${this.escapeHTML(ex.name)}</p>
+                                    <span class="text-[10px] text-zinc-500">${(ex.sets || []).length} séries</span>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5">${setsBadges}</div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `
+                        <article class="bg-oled-900 border border-oled-800 rounded-2xl p-4 space-y-3 shadow-md">
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">${formattedDate}</span>
+                                    <h3 class="text-base font-extrabold text-white mt-0.5">${this.escapeHTML(w.title)}</h3>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
+                                        ${Math.round(workoutVolume).toLocaleString('fr-FR')} kg
+                                    </span>
+                                    <p class="text-[10px] text-zinc-500 mt-1">${validSetsCount} séries validées</p>
+                                </div>
+                            </div>
+
+                            <!-- Détail complet de chaque série (Série N : Reps × Charge kg) -->
+                            <div class="space-y-2">
+                                ${exercisesHtml}
+                            </div>
+
+                            <!-- Actions sur la séance -->
+                            <div class="grid grid-cols-3 gap-2 pt-1 border-t border-oled-800">
+                                <button onclick="App.editPastWorkout('${w.id}')" class="touch-target py-2 rounded-xl bg-oled-800 hover:bg-oled-700 text-xs font-bold text-zinc-200 flex items-center justify-center gap-1">
+                                    <span>Modifier</span>
+                                </button>
+                                <button onclick="App.duplicatePastWorkout('${w.id}')" class="touch-target py-2 rounded-xl bg-oled-800 hover:bg-oled-700 text-xs font-bold text-emerald-400 flex items-center justify-center gap-1">
+                                    <span>Reprendre</span>
+                                </button>
+                                <button onclick="App.confirmDeleteWorkout('${w.id}')" class="touch-target py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-xs font-bold text-rose-400 flex items-center justify-center gap-1">
+                                    <span>Supprimer</span>
+                                </button>
+                            </div>
+                        </article>
+                    `;
+                }).join('');
+            },
+
+            editPastWorkout(workoutId) {
+                const found = this.workouts.find(w => w.id === workoutId);
+                if (!found) return;
+                this.activeWorkout = JSON.parse(JSON.stringify(found));
+                this.isEditingExisting = true;
+                this.triggerAutoSave();
+                this.switchTab('workout');
+                this.showToast("Séance chargée en mode édition");
+            },
+
+            duplicatePastWorkout(workoutId) {
+                const found = this.workouts.find(w => w.id === workoutId);
+                if (!found) return;
+                const copy = JSON.parse(JSON.stringify(found));
+                copy.id = this.uid('wk');
+                copy.date = this.todayISO();
+                copy.exercises.forEach(ex => {
+                    ex.sets.forEach(s => {
+                        s.prevHint = `${s.weight}kg × ${s.reps}`;
+                        s.valide = false;
+                    });
+                });
+                this.activeWorkout = copy;
+                this.isEditingExisting = false;
+                this.triggerAutoSave();
+                this.switchTab('workout');
+                this.showToast("Séance dupliquée pour aujourd'hui");
+            },
+
+            confirmDeleteWorkout(workoutId) {
+                this.openDialogModal({
+                    title: "Supprimer cette séance ?",
+                    message: "Cette séance sera retirée de ta base locale IndexedDB. Pense à exporter une sauvegarde JSON si besoin.",
+                    confirmText: "Supprimer",
+                    confirmClass: "bg-rose-500 text-white",
+                    onConfirm: async () => {
+                        await StorageEngine.deleteWorkout(workoutId);
+                        this.workouts = await StorageEngine.getAllWorkouts();
+                        this.renderHistoryView();
+                        this.showToast("Séance supprimée");
+                    }
+                });
+            },
+
+            /**
+             * 3. RENDU ANALYTIQUE & GRAPHIQUE CHART.JS
+             */
+            populateAnalyticsSelectorAndRender() {
+                const select = document.getElementById('analytics-exercise-select');
+                const currentVal = select.value;
+
+                // Rassembler tous les exercices présents dans l'historique + le catalogue
+                const recordedNames = new Set();
+                this.workouts.forEach(w => (w.exercises || []).forEach(ex => recordedNames.add(ex.name)));
+                const allNames = Array.from(new Set([...recordedNames, ...DEFAULT_EXERCISES_CATALOG]));
+
+                select.innerHTML = allNames.map(name => {
+                    const hasHistory = recordedNames.has(name);
+                    return `<option value="${this.escapeHTML(name)}">${hasHistory ? '📈 ' : ''}${this.escapeHTML(name)}</option>`;
+                }).join('');
+
+                if (currentVal && allNames.includes(currentVal)) {
+                    select.value = currentVal;
+                } else if (recordedNames.size > 0) {
+                    select.value = Array.from(recordedNames)[0];
+                }
+
+                this.renderAnalyticsView();
+            },
+
+            setChartMode(mode) {
+                this.chartMode = mode;
+                ['both', 'weight', 'volume'].forEach(m => {
+                    const btn = document.getElementById(`chart-mode-${m}`);
+                    btn.className = (m === mode)
+                        ? "px-2.5 py-1 rounded-lg bg-oled-800 text-white"
+                        : "px-2.5 py-1 rounded-lg text-zinc-400";
+                });
+                this.renderAnalyticsView();
+            },
+
+            renderAnalyticsView() {
+                const exerciseName = document.getElementById('analytics-exercise-select').value;
+                if (!exerciseName) return;
+
+                // Extraire par ordre chronologique croissant toutes les séances contenant cet exercice
+                const chronological = [...this.workouts].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+                const points = [];
+
+                chronological.forEach(w => {
+                    const matchingEx = (w.exercises || []).find(e => e.name.toLowerCase() === exerciseName.toLowerCase());
+                    if (!matchingEx || !matchingEx.sets || matchingEx.sets.length === 0) return;
+
+                    const validSets = matchingEx.sets.filter(s => s.valide);
+                    const setsToAnalyze = validSets.length > 0 ? validSets : matchingEx.sets;
+
+                    let maxWeight = 0;
+                    let bestSetReps = 0;
+                    let totalVolume = 0;
+                    let totalWeightSum = 0;
+                    let bestEstimated1RM = 0;
+
+                    setsToAnalyze.forEach(s => {
+                        const weight = this.parseDecimal(s.weight);
+                        const reps = this.parseIntSafe(s.reps);
+                        const vol = weight * reps;
+                        totalVolume += vol;
+                        totalWeightSum += weight;
+
+                        if (weight > maxWeight || (weight === maxWeight && reps > bestSetReps)) {
+                            maxWeight = weight;
+                            bestSetReps = reps;
+                        }
+                        const epley = weight * (1 + reps / 30);
+                        if (epley > bestEstimated1RM) bestEstimated1RM = epley;
+                    });
+
+                    const avgWeight = setsToAnalyze.length > 0 ? (totalWeightSum / setsToAnalyze.length) : 0;
+
+                    points.push({
+                        date: w.date,
+                        maxWeight,
+                        bestSetReps,
+                        bestSetStr: `${maxWeight} kg × ${bestSetReps}`,
+                        totalVolume: Math.round(totalVolume),
+                        avgWeight: Number(avgWeight.toFixed(1)),
+                        est1RM: Number(bestEstimated1RM.toFixed(1))
+                    });
+                });
+
+                document.getElementById('analytics-sessions-count').textContent = `${points.length} séance${points.length > 1 ? 's' : ''}`;
+
+                // Mise à jour des KPIs
+                if (points.length === 0) {
+                    document.getElementById('kpi-max-weight').textContent = '— kg';
+                    document.getElementById('kpi-max-weight-sub').textContent = 'Aucune séance';
+                    document.getElementById('kpi-max-volume').textContent = '— kg';
+                    document.getElementById('kpi-max-volume-sub').textContent = 'Aucune séance';
+                    document.getElementById('kpi-est-1rm').textContent = '— kg';
+                } else {
+                    const prPoint = points.reduce((best, p) => (p.maxWeight >= best.maxWeight ? p : best), points[0]);
+                    const volPoint = points.reduce((best, p) => (p.totalVolume >= best.totalVolume ? p : best), points[0]);
+                    const rmPoint = points.reduce((best, p) => (p.est1RM >= best.est1RM ? p : best), points[0]);
+
+                    document.getElementById('kpi-max-weight').textContent = `${prPoint.maxWeight} kg`;
+                    document.getElementById('kpi-max-weight-sub').textContent = `${prPoint.bestSetStr} (${prPoint.date})`;
+                    document.getElementById('kpi-max-volume').textContent = `${volPoint.totalVolume.toLocaleString('fr-FR')} kg`;
+                    document.getElementById('kpi-max-volume-sub').textContent = `Séance du ${volPoint.date}`;
+                    document.getElementById('kpi-est-1rm').textContent = `${rmPoint.est1RM} kg`;
+                }
+
+                // Rendu du graphique Chart.js
+                this.renderProgressionChart(points);
+
+                // Rendu du tableau chronologique (du plus récent au plus ancien)
+                const tbody = document.getElementById('analytics-table-body');
+                if (points.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-zinc-500">Aucune donnée enregistrée pour cet exercice.</td></tr>`;
+                } else {
+                    tbody.innerHTML = [...points].reverse().map(p => `
+                        <tr class="hover:bg-oled-800/60 transition-colors">
+                            <td class="py-3 px-3 font-semibold text-white whitespace-nowrap">${p.date}</td>
+                            <td class="py-3 px-3">
+                                <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono font-bold">
+                                    ${p.bestSetStr}
+                                </span>
+                            </td>
+                            <td class="py-3 px-3 text-right font-mono font-bold text-indigo-400">${p.totalVolume.toLocaleString('fr-FR')} kg</td>
+                            <td class="py-3 px-3 text-right font-mono text-zinc-300">${p.avgWeight} kg</td>
+                        </tr>
+                    `).join('');
+                }
+            },
+
+            renderProgressionChart(points) {
+                const ctx = document.getElementById('progression-chart').getContext('2d');
+                if (this.chartInstance) {
+                    this.chartInstance.destroy();
+                }
+
+                const labels = points.map(p => {
+                    const parts = (p.date || '').split('-');
+                    return parts.length === 3 ? `${parts[2]}/${parts[1]}` : p.date;
+                });
+
+                const datasets = [];
+                if (this.chartMode === 'both' || this.chartMode === 'weight') {
+                    datasets.push({
+                        label: 'Charge Max (kg)',
+                        data: points.map(p => p.maxWeight),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.18)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#10b981',
+                        pointRadius: 4,
+                        tension: 0.25,
+                        yAxisID: 'yWeight',
+                        type: 'line',
+                        fill: this.chartMode === 'weight'
+                    });
+                }
+
+                if (this.chartMode === 'both' || this.chartMode === 'volume') {
+                    datasets.push({
+                        label: 'Volume Total (kg)',
+                        data: points.map(p => p.totalVolume),
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.28)',
+                        borderWidth: 2,
+                        borderRadius: 6,
+                        yAxisID: 'yVolume',
+                        type: this.chartMode === 'volume' ? 'line' : 'bar',
+                        tension: 0.25
+                    });
+                }
+
+                this.chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: {
+                                labels: { color: '#d4d4d8', font: { size: 11, weight: 'bold' } }
+                            },
+                            tooltip: {
+                                backgroundColor: '#18181b',
+                                titleColor: '#ffffff',
+                                bodyColor: '#e4e4e7',
+                                borderColor: '#3f3f46',
+                                borderWidth: 1
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: '#a1a1aa', font: { size: 10 } },
+                                grid: { color: 'rgba(63, 63, 70, 0.25)' }
+                            },
+                            yWeight: {
+                                type: 'linear',
+                                display: this.chartMode === 'both' || this.chartMode === 'weight',
+                                position: 'left',
+                                ticks: { color: '#34d399', font: { size: 10, weight: 'bold' }, callback: v => `${v} kg` },
+                                grid: { color: 'rgba(63, 63, 70, 0.25)' }
+                            },
+                            yVolume: {
+                                type: 'linear',
+                                display: this.chartMode === 'both' || this.chartMode === 'volume',
+                                position: 'right',
+                                ticks: { color: '#818cf8', font: { size: 10 }, callback: v => `${v} kg` },
+                                grid: { drawOnChartArea: this.chartMode === 'volume', color: 'rgba(63, 63, 70, 0.25)' }
+                            }
+                        }
+                    }
+                });
+            },
+
+            /**
+             * 4. EXPORT / IMPORT JSON POUR L'APPLICATION FICHIERS DE L'IPHONE
+             */
+            renderDataStorageStats() {
+                let totalSets = 0;
+                this.workouts.forEach(w => (w.exercises || []).forEach(ex => { totalSets += (ex.sets || []).length; }));
+                const payloadStr = JSON.stringify(this.workouts);
+                const sizeKb = (new Blob([payloadStr]).size / 1024).toFixed(1);
+
+                document.getElementById('storage-stat-workouts').textContent = this.workouts.length;
+                document.getElementById('storage-stat-sets').textContent = totalSets;
+                document.getElementById('storage-stat-size').textContent = `${sizeKb} Ko`;
+            },
+
+            async exportBackupJSON(useNativeShare = true) {
+                const backupPayload = {
+                    app: "GymTracker Pro iOS",
+                    version: 2,
+                    exportedAt: new Date().toISOString(),
+                    customExercises: StorageEngine.getCustomExercises(),
+                    workouts: this.workouts
+                };
+
+                const jsonString = JSON.stringify(backupPayload, null, 2);
+                const fileName = "workouts_backup.json";
+                const blob = new Blob([jsonString], { type: "application/json" });
+
+                // Si l'utilisateur est sur iPhone (Web Share API Level 2 avec support de fichiers vers l'app Fichiers)
+                if (useNativeShare && navigator.canShare && window.File) {
+                    try {
+                        const file = new File([blob], fileName, { type: "application/json" });
+                        if (navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                                files: [file],
+                                title: "Sauvegarde GymTracker (workouts_backup.json)",
+                                text: "Choisis « Enregistrer dans Fichiers » pour stocker ta base de musculation sur ton iPhone."
+                            });
+                            this.showToast("Menu Fichiers iOS ouvert !");
+                            return;
+                        }
+                    } catch (err) {
+                        if (err.name === 'AbortError') return;
+                    }
+                }
+
+                // Fallback téléchargement direct compatible Safari iOS & Desktop
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                this.showToast("Fichier workouts_backup.json téléchargé !");
+            },
+
+            handleImportJSON(event) {
+                const file = event.target.files && event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        const importedWorkouts = Array.isArray(parsed) ? parsed : (parsed.workouts || []);
+
+                        if (!Array.isArray(importedWorkouts) || importedWorkouts.length === 0) {
+                            this.showToast("Le fichier JSON ne contient aucune séance valide", true);
+                            return;
+                        }
+
+                        if (Array.isArray(parsed.customExercises)) {
+                            parsed.customExercises.forEach(name => StorageEngine.addCustomExercise(name));
+                        }
+
+                        for (const w of importedWorkouts) {
+                            if (w && w.id && w.date && Array.isArray(w.exercises)) {
+                                await StorageEngine.saveWorkout(w);
+                            }
+                        }
+
+                        this.workouts = await StorageEngine.getAllWorkouts();
+                        this.renderDataStorageStats();
+                        this.showToast(`${importedWorkouts.length} séance(s) restaurée(s) avec succès !`);
+                    } catch (err) {
+                        this.showToast("Fichier JSON invalide ou corrompu", true);
+                    } finally {
+                        event.target.value = '';
+                    }
+                };
+                reader.readAsText(file);
+            },
+
+            /**
+             * Génération de 4 semaines de progression réaliste pour tester immédiatement les graphiques
+             */
+            async seedDemoData() {
+                const now = new Date();
+                const daysAgoISO = (days) => {
+                    const d = new Date(now.getTime() - days * 86400000);
+                    return d.toISOString().slice(0, 10);
+                };
+
+                const demoSessions = [
+                    // Semaine 1
+                    {
+                        id: "demo_w1_s1",
+                        date: daysAgoISO(24),
+                        title: "Séance 1 : Haut du corps (Force/Volume)",
+                        exercises: [
+                            { id: "e1", name: "Développé couché aux haltères", sets: [
+                                { set_index: 1, weight: 20, reps: 8, valide: true },
+                                { set_index: 2, weight: 20, reps: 8, valide: true },
+                                { set_index: 3, weight: 20, reps: 7, valide: true },
+                                { set_index: 4, weight: 20, reps: 6, valide: true }
+                            ]},
+                            { id: "e2", name: "Tirage vertical (poulie haute)", sets: [
+                                { set_index: 1, weight: 45, reps: 10, valide: true },
+                                { set_index: 2, weight: 45, reps: 9, valide: true },
+                                { set_index: 3, weight: 45, reps: 8, valide: true },
+                                { set_index: 4, weight: 45, reps: 8, valide: true }
+                            ]}
+                        ]
+                    },
+                    {
+                        id: "demo_w1_s2",
+                        date: daysAgoISO(22),
+                        title: "Séance 2 : Bas du corps (Focus Squat)",
+                        exercises: [
+                            { id: "e3", name: "Squat barre libre", sets: [
+                                { set_index: 1, weight: 80, reps: 6, valide: true },
+                                { set_index: 2, weight: 80, reps: 6, valide: true },
+                                { set_index: 3, weight: 80, reps: 5, valide: true },
+                                { set_index: 4, weight: 80, reps: 5, valide: true }
+                            ]},
+                            { id: "e4", name: "Presse à cuisses", sets: [
+                                { set_index: 1, weight: 120, reps: 10, valide: true },
+                                { set_index: 2, weight: 120, reps: 10, valide: true },
+                                { set_index: 3, weight: 120, reps: 10, valide: true }
+                            ]}
+                        ]
+                    },
+                    // Semaine 2 (Double progression : validation du haut de la fourchette)
+                    {
+                        id: "demo_w2_s1",
+                        date: daysAgoISO(17),
+                        title: "Séance 1 : Haut du corps (Force/Volume)",
+                        exercises: [
+                            { id: "e5", name: "Développé couché aux haltères", sets: [
+                                { set_index: 1, weight: 20, reps: 8, valide: true },
+                                { set_index: 2, weight: 20, reps: 8, valide: true },
+                                { set_index: 3, weight: 20, reps: 8, valide: true },
+                                { set_index: 4, weight: 20, reps: 8, valide: true }
+                            ]},
+                            { id: "e6", name: "Tirage vertical (poulie haute)", sets: [
+                                { set_index: 1, weight: 45, reps: 10, valide: true },
+                                { set_index: 2, weight: 45, reps: 10, valide: true },
+                                { set_index: 3, weight: 45, reps: 10, valide: true },
+                                { set_index: 4, weight: 45, reps: 9, valide: true }
+                            ]}
+                        ]
+                    },
+                    {
+                        id: "demo_w2_s2",
+                        date: daysAgoISO(15),
+                        title: "Séance 2 : Bas du corps (Focus Squat)",
+                        exercises: [
+                            { id: "e7", name: "Squat barre libre", sets: [
+                                { set_index: 1, weight: 80, reps: 8, valide: true },
+                                { set_index: 2, weight: 80, reps: 8, valide: true },
+                                { set_index: 3, weight: 80, reps: 7, valide: true },
+                                { set_index: 4, weight: 80, reps: 7, valide: true }
+                            ]},
+                            { id: "e8", name: "Presse à cuisses", sets: [
+                                { set_index: 1, weight: 130, reps: 10, valide: true },
+                                { set_index: 2, weight: 130, reps: 10, valide: true },
+                                { set_index: 3, weight: 130, reps: 10, valide: true }
+                            ]}
+                        ]
+                    },
+                    // Semaine 3 (Augmentation des charges : 22kg aux haltères, 85kg au squat)
+                    {
+                        id: "demo_w3_s1",
+                        date: daysAgoISO(10),
+                        title: "Séance 1 : Haut du corps (Force/Volume)",
+                        exercises: [
+                            { id: "e9", name: "Développé couché aux haltères", sets: [
+                                { set_index: 1, weight: 22, reps: 7, valide: true },
+                                { set_index: 2, weight: 22, reps: 7, valide: true },
+                                { set_index: 3, weight: 22, reps: 6, valide: true },
+                                { set_index: 4, weight: 22, reps: 6, valide: true }
+                            ]},
+                            { id: "e10", name: "Tirage vertical (poulie haute)", sets: [
+                                { set_index: 1, weight: 50, reps: 8, valide: true },
+                                { set_index: 2, weight: 50, reps: 8, valide: true },
+                                { set_index: 3, weight: 50, reps: 8, valide: true },
+                                { set_index: 4, weight: 50, reps: 8, valide: true }
+                            ]}
+                        ]
+                    },
+                    {
+                        id: "demo_w3_s2",
+                        date: daysAgoISO(8),
+                        title: "Séance 2 : Bas du corps (Focus Squat)",
+                        exercises: [
+                            { id: "e11", name: "Squat barre libre", sets: [
+                                { set_index: 1, weight: 85, reps: 6, valide: true },
+                                { set_index: 2, weight: 85, reps: 6, valide: true },
+                                { set_index: 3, weight: 85, reps: 6, valide: true },
+                                { set_index: 4, weight: 85, reps: 6, valide: true }
+                            ]},
+                            { id: "e12", name: "Presse à cuisses", sets: [
+                                { set_index: 1, weight: 140, reps: 12, valide: true },
+                                { set_index: 2, weight: 140, reps: 11, valide: true },
+                                { set_index: 3, weight: 140, reps: 10, valide: true }
+                            ]}
+                        ]
+                    },
+                    // Semaine 4 (Nouveaux records : 24kg aux haltères, 90kg au squat)
+                    {
+                        id: "demo_w4_s1",
+                        date: daysAgoISO(3),
+                        title: "Séance 1 : Haut du corps (Force/Volume)",
+                        exercises: [
+                            { id: "e13", name: "Développé couché aux haltères", sets: [
+                                { set_index: 1, weight: 24, reps: 7, valide: true },
+                                { set_index: 2, weight: 24, reps: 7, valide: true },
+                                { set_index: 3, weight: 24, reps: 6, valide: true },
+                                { set_index: 4, weight: 24, reps: 6, valide: true }
+                            ]},
+                            { id: "e14", name: "Tirage vertical (poulie haute)", sets: [
+                                { set_index: 1, weight: 52.5, reps: 9, valide: true },
+                                { set_index: 2, weight: 52.5, reps: 9, valide: true },
+                                { set_index: 3, weight: 52.5, reps: 8, valide: true },
+                                { set_index: 4, weight: 52.5, reps: 8, valide: true }
+                            ]}
+                        ]
+                    },
+                    {
+                        id: "demo_w4_s2",
+                        date: daysAgoISO(1),
+                        title: "Séance 2 : Bas du corps (Focus Squat)",
+                        exercises: [
+                            { id: "e15", name: "Squat barre libre", sets: [
+                                { set_index: 1, weight: 90, reps: 6, valide: true },
+                                { set_index: 2, weight: 90, reps: 6, valide: true },
+                                { set_index: 3, weight: 90, reps: 5, valide: true },
+                                { set_index: 4, weight: 90, reps: 5, valide: true }
+                            ]},
+                            { id: "e16", name: "Presse à cuisses", sets: [
+                                { set_index: 1, weight: 150, reps: 10, valide: true },
+                                { set_index: 2, weight: 150, reps: 10, valide: true },
+                                { set_index: 3, weight: 150, reps: 10, valide: true }
+                            ]}
+                        ]
+                    }
+                ];
+
+                for (const s of demoSessions) {
+                    await StorageEngine.saveWorkout(s);
+                }
+
+                this.workouts = await StorageEngine.getAllWorkouts();
+                this.createWorkoutFromTemplate('s1', false);
+                this.showToast("4 semaines de progression chargées !");
+                this.switchTab('analytics');
+            },
+
+            confirmClearAllData() {
+                this.openDialogModal({
+                    title: "Tout effacer de cet iPhone ?",
+                    message: "Toutes les séances enregistrées dans IndexedDB seront supprimées. Assure-toi d'avoir exporté ton fichier workouts_backup.json au préalable.",
+                    confirmText: "Tout supprimer",
+                    confirmClass: "bg-rose-500 text-white",
+                    onConfirm: async () => {
+                        await StorageEngine.clearAll();
+                        this.workouts = [];
+                        this.createWorkoutFromTemplate('s1', false);
+                        this.renderDataStorageStats();
+                        this.showToast("Base de données réinitialisée");
+                    }
+                });
+            },
+
+            /**
+             * Modale personnalisée (remplace alert/confirm natifs)
+             */
+            openDialogModal({ title, message, confirmText, confirmClass, onConfirm }) {
+                const modal = document.getElementById('dialog-modal');
+                const content = document.getElementById('dialog-modal-content');
+                content.innerHTML = `
+                    <h3 class="text-base font-extrabold text-white">${this.escapeHTML(title)}</h3>
+                    <p class="text-xs text-zinc-400 leading-relaxed">${this.escapeHTML(message)}</p>
+                    <div class="flex gap-2.5 pt-2">
+                        <button id="dialog-cancel-btn" class="flex-1 touch-target py-3 rounded-xl bg-oled-800 text-zinc-300 font-bold text-xs border border-oled-700">Annuler</button>
+                        <button id="dialog-confirm-btn" class="flex-1 touch-target py-3 rounded-xl font-extrabold text-xs ${confirmClass || 'bg-emerald-500 text-zinc-950'}">${this.escapeHTML(confirmText || 'Confirmer')}</button>
+                    </div>
+                `;
+                modal.classList.remove('hidden');
+
+                document.getElementById('dialog-cancel-btn').onclick = () => modal.classList.add('hidden');
+                document.getElementById('dialog-confirm-btn').onclick = () => {
+                    modal.classList.add('hidden');
+                    if (typeof onConfirm === 'function') onConfirm();
+                };
+            },
+
+            toastTimer: null,
+            showToast(msg, isError = false) {
+                const banner = document.getElementById('toast-banner');
+                const text = document.getElementById('toast-text');
+                text.textContent = msg;
+                banner.className = `fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-200 px-4 py-2.5 rounded-2xl font-extrabold text-xs shadow-xl flex items-center gap-2 ${
+                    isError ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-zinc-950'
+                }`;
+                banner.style.opacity = '1';
+                clearTimeout(this.toastTimer);
+                this.toastTimer = setTimeout(() => {
+                    banner.style.opacity = '0';
+                }, 2600);
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => App.init());
+    </script>
+</body>
+</html>
